@@ -1,0 +1,34 @@
+{
+  "name": "mui-templates",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router": "^6.26.0",
+    "react-router-dom": "^6.26.0",
+    "@mui/material": "^7.3.6",
+    "@mui/icons-material": "^7.3.6",
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@mui/x-data-grid": "^7.3.6",
+    "@mui/x-data-grid-pro": "^7.3.6",
+    "@mui/x-charts": "^7.3.6",
+    "@mui/x-date-pickers": "^7.3.6",
+    "@mui/x-tree-view": "^7.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0"
+  }
+}
+
