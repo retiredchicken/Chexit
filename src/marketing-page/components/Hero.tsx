@@ -21,6 +21,7 @@ export default function Hero({ onUploadComplete }: HeroProps) {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,6 +29,7 @@ export default function Hero({ onUploadComplete }: HeroProps) {
     if (file) {
       setSelectedFile(file);
       setUploadError(null);
+      setUploadSuccess(false);
     }
   };
 
@@ -39,6 +41,7 @@ export default function Hero({ onUploadComplete }: HeroProps) {
     if (!selectedFile) return;
     setUploading(true);
     setUploadError(null);
+    setUploadSuccess(false);
     try {
       const storageRef = ref(storage, `uploads/${Date.now()}_${selectedFile.name}`);
       await uploadBytes(storageRef, selectedFile);
@@ -50,9 +53,11 @@ export default function Hero({ onUploadComplete }: HeroProps) {
         uploadedAt: serverTimestamp(),
       });
       onUploadComplete?.(downloadURL);
+      setUploadSuccess(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       setUploadError(message);
+      setUploadSuccess(false);
     } finally {
       setUploading(false);
     }
@@ -166,6 +171,11 @@ export default function Hero({ onUploadComplete }: HeroProps) {
           {uploadError && (
             <Typography variant="body2" color="error" sx={{ textAlign: 'center' }}>
               {uploadError}
+            </Typography>
+          )}
+          {uploadSuccess && (
+            <Typography variant="body2" color="success.main" sx={{ textAlign: 'center' }}>
+              File uploaded. Check preview below.
             </Typography>
           )}
           <Typography
