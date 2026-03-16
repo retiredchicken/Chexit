@@ -13,7 +13,11 @@ import { storage, db } from '../../firebase';
 const UPLOADS_COLLECTION = 'uploads';
 const LATEST_DOC_ID = 'latest';
 
-export default function Hero() {
+type HeroProps = {
+  onUploadComplete?: (downloadUrl: string) => void;
+};
+
+export default function Hero({ onUploadComplete }: HeroProps) {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
@@ -45,6 +49,7 @@ export default function Hero() {
         fileName: selectedFile.name,
         uploadedAt: serverTimestamp(),
       });
+      onUploadComplete?.(downloadURL);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       setUploadError(message);

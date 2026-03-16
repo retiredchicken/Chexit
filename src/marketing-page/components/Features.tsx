@@ -27,7 +27,12 @@ function formatUploadedAt(seconds: number | null): string {
   return `Uploaded • ${diffMins} min ago`;
 }
 
-export default function Features() {
+type FeaturesProps = {
+  /** When set, this URL is shown in the Input X-Ray preview (e.g. right after upload). */
+  previewImageUrl?: string | null;
+};
+
+export default function Features({ previewImageUrl }: FeaturesProps) {
   const pageBg = 'background.default';
   const cardBg = 'background.default';
   const cardBorder = 'divider';
@@ -65,10 +70,14 @@ export default function Features() {
     return () => unsub();
   }, []);
 
-  const previewSrc = latestUpload?.downloadURL ?? cxrIn;
-  const previewSubheader = latestUpload
-    ? formatUploadedAt(latestUpload.uploadedAt)
-    : 'Uploaded • 2 min ago';
+  // Prefer URL passed from parent (immediate post-upload) then Firestore, then default
+  const previewSrc = previewImageUrl ?? latestUpload?.downloadURL ?? cxrIn;
+  const isFromUpload = Boolean(previewImageUrl ?? latestUpload);
+  const previewSubheader = previewImageUrl
+    ? 'Uploaded • just now'
+    : isFromUpload
+      ? formatUploadedAt(latestUpload?.uploadedAt ?? null)
+      : 'Uploaded • 2 min ago';
 
   return (
     <Box sx={{ bgcolor: pageBg }}>
@@ -122,6 +131,7 @@ export default function Features() {
             <CardContent sx={{ pt: 1 }}>
               <Box
                 component="img"
+                key={previewSrc}
                 src={previewSrc}
                 alt="Input chest X-ray"
                 sx={{
