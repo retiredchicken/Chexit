@@ -13,7 +13,6 @@ import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 // Assets served from /assets at the project root (e.g., public/assets)
-const cxrIn = '/assets/cxrin.png';
 const cxrOut = '/assets/cxrout.png';
 
 function formatUploadedAt(seconds: number | null): string {
@@ -70,14 +69,14 @@ export default function Features({ previewImageUrl }: FeaturesProps) {
     return () => unsub();
   }, []);
 
-  // Prefer URL passed from parent (immediate post-upload) then Firestore, then default
-  const previewSrc = previewImageUrl ?? latestUpload?.downloadURL ?? cxrIn;
+  // Only show image when there is an upload; otherwise show black placeholder
+  const previewSrc = previewImageUrl ?? latestUpload?.downloadURL ?? null;
   const isFromUpload = Boolean(previewImageUrl ?? latestUpload);
   const previewSubheader = previewImageUrl
     ? 'Uploaded • just now'
     : isFromUpload
       ? formatUploadedAt(latestUpload?.uploadedAt ?? null)
-      : 'Uploaded • 2 min ago';
+      : 'No image uploaded';
 
   return (
     <Box sx={{ bgcolor: pageBg }}>
@@ -129,24 +128,37 @@ export default function Features({ previewImageUrl }: FeaturesProps) {
               }}
             />
             <CardContent sx={{ pt: 1 }}>
-              <Box
-                component="img"
-                key={previewSrc}
-                src={previewSrc}
-                alt="Input chest X-ray"
-                sx={{
-                  borderRadius: 2,
-                  bgcolor: 'background.default',
-                  border: '1px dashed',
-                  borderColor: cardBorder,
-                  width: '100%',
-                  aspectRatio: '3 / 4',
-                  objectFit: 'cover',
-                }}
-              />
+              {previewSrc ? (
+                <Box
+                  component="img"
+                  key={previewSrc}
+                  src={previewSrc}
+                  alt="Input chest X-ray"
+                  sx={{
+                    borderRadius: 2,
+                    bgcolor: 'background.default',
+                    border: '1px dashed',
+                    borderColor: cardBorder,
+                    width: '100%',
+                    aspectRatio: '3 / 4',
+                    objectFit: 'cover',
+                  }}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    borderRadius: 2,
+                    bgcolor: '#000',
+                    border: '1px dashed',
+                    borderColor: cardBorder,
+                    width: '100%',
+                    aspectRatio: '3 / 4',
+                  }}
+                />
+              )}
               <Box sx={{ mt: 2 }}>
                 <Typography variant="caption" sx={{ color: mutedText }}>
-                  View: PA • Resolution: 1024×1024
+                  {previewSrc ? 'View: PA • Resolution: 1024×1024' : 'Upload an X-ray to preview'}
                 </Typography>
               </Box>
             </CardContent>
