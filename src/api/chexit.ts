@@ -12,17 +12,40 @@ export type PredictUiState = {
 };
 
 /**
- * Predict URL:
- * - No VITE_CHEXIT_API_URL → always same-origin `/api/predict` (Vite dev + preview proxy → :8000).
- *   Works for any dev hostname (localhost, 127.0.0.1, Cursor tunnel, etc.).
- * - VITE_CHEXIT_API_URL set → direct URL (required for Vercel / production API).
+ * Use same-origin `/api/predict` only when Vite’s dev/preview server can proxy to FastAPI.
+ * On Vercel (and similar), `vercel.json` rewrites ALL paths to `index.html`; POST `/api/predict`
+ * hits the static page and returns 405 Method Not Allowed — must use VITE_CHEXIT_API_URL instead.
  */
+function canUseViteApiProxy(): boolean {
+  if (import.meta.env.VITE_CHEXIT_API_URL?.trim()) {
+    return false;
+  }
+  if (import.meta.env.VITE_USE_RELATIVE_API === '1') {
+    return true;
+  }
+  if (import.meta.env.DEV) {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const h = window.location.hostname;
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+}
+
 function predictUrl(): string {
   const trimmed = import.meta.env.VITE_CHEXIT_API_URL?.trim();
   if (trimmed) {
     return `${trimmed.replace(/\/$/, '')}/predict`;
   }
-  return '/api/predict';
+  if (canUseViteApiProxy()) {
+    return '/api/predict';
+  }
+  throw new Error(
+    'VITE_CHEXIT_API_URL is not set. On Vercel/static hosting, POST /api/predict is rewritten to index.html and returns 405. ' +
+      'In Vercel → Settings → Environment Variables, set VITE_CHEXIT_API_URL to your FastAPI base URL (https://your-api…), redeploy, ' +
+      'and add that site origin to CHEXIT_CORS_ORIGINS on the API.',
+  );
 }
 
 function apiLabelForErrors(): string {
@@ -149,6 +172,13 @@ export async function predictImage(file: File): Promise<PredictResponse> {
     bodyChars: bodyText.length,
     elapsedSec: Math.round((performance.now() - t0) / 1000),
   });
+
+  if (!res.ok && res.status === 405) {
+    throw new Error(
+      'HTTP 405: POST was rejected. On Vercel this usually means the request hit the SPA (rewrite to index.html), not FastAPI. ' +
+        'Set VITE_CHEXIT_API_URL to your deployed API’s https base URL and redeploy. Locally use npm run dev so /api proxies to port 8000.',
+    );
+  }
 
   let raw: unknown;
   try {

@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_RUN_FIREBASE_INTEGRATION?: string;
   /** Chexit FastAPI base URL (no trailing slash), e.g. http://127.0.0.1:8000 */
   readonly VITE_CHEXIT_API_URL?: string;
+  /** Set to "1" to allow same-origin /api/predict on non-localhost (e.g. vite preview over LAN). */
+  readonly VITE_USE_RELATIVE_API?: string;
 }
 
 interface ImportMeta {
