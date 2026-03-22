@@ -1,5 +1,6 @@
 import * as React from 'react';
 import CssBaseline from '@mui/material/CssBaseline';
+import type { PredictUiState } from '../api/chexit';
 import AppTheme from '../../shared-theme/AppTheme';
 import AppAppBar from './components/AppAppBar';
 import Hero from './components/Hero';
@@ -11,9 +12,16 @@ import Features from './components/Features';
 // import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 
+const initialPredict: PredictUiState = {
+  loading: false,
+  error: null,
+  data: null,
+};
+
 export default function MarketingPage(props: { disableCustomTheme?: boolean }) {
   const [uploadedPreviewUrl, setUploadedPreviewUrl] = React.useState<string | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
+  const [predictUi, setPredictUi] = React.useState<PredictUiState>(initialPredict);
 
   return (
     <AppTheme {...props}>
@@ -23,12 +31,14 @@ export default function MarketingPage(props: { disableCustomTheme?: boolean }) {
       <Hero
         onUploadComplete={setUploadedPreviewUrl}
         onLocalPreviewChange={setLocalPreviewUrl}
+        onPredictUiChange={setPredictUi}
       />
       <div>
         {/* <LogoCollection /> */}
         <Features
           previewImageUrl={uploadedPreviewUrl}
           localPreviewUrl={localPreviewUrl}
+          predictUi={predictUi}
         />
         {/* <Divider />
         <Testimonials />

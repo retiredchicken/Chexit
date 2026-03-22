@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_TEMPLATE_IMAGE_URL?: string;
   /** Set to "1" to run `npm run test:integration` against live Firebase. */
   readonly VITE_RUN_FIREBASE_INTEGRATION?: string;
+  /** Chexit FastAPI base URL (no trailing slash), e.g. http://127.0.0.1:8000 */
+  readonly VITE_CHEXIT_API_URL?: string;
 }
 
 interface ImportMeta {

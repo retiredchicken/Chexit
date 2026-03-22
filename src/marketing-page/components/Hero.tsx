@@ -8,6 +8,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { predictImage } from '../../api/chexit';
+import type { PredictUiState } from '../../api/chexit';
 import { storage, db } from '../../firebase';
 
 const UPLOADS_COLLECTION = 'uploads';
@@ -18,11 +20,17 @@ type HeroProps = {
   onUploadComplete?: (downloadUrl: string) => void;
   /** Temporary `blob:` URL for instant preview in the dashboard (no upload required). */
   onLocalPreviewChange?: (previewUrl: string | null) => void;
+  onPredictUiChange?: (state: PredictUiState) => void;
 };
 
-export default function Hero({ onUploadComplete, onLocalPreviewChange }: HeroProps) {
+export default function Hero({
+  onUploadComplete,
+  onLocalPreviewChange,
+  onPredictUiChange,
+}: HeroProps) {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
+  const [analyzing, setAnalyzing] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = React.useState(false);
@@ -59,10 +67,28 @@ export default function Hero({ onUploadComplete, onLocalPreviewChange }: HeroPro
     setUploadError(null);
     setUploadSuccess(false);
     setLocalPreviewUrl(URL.createObjectURL(file));
+    onPredictUiChange?.({ loading: false, error: null, data: null });
   };
 
   const handleBrowseClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) {
+      return;
+    }
+    setAnalyzing(true);
+    onPredictUiChange?.({ loading: true, error: null, data: null });
+    try {
+      const data = await predictImage(selectedFile);
+      onPredictUiChange?.({ loading: false, error: null, data });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Analyze failed';
+      onPredictUiChange?.({ loading: false, error: message, data: null });
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -158,7 +184,9 @@ export default function Hero({ onUploadComplete, onLocalPreviewChange }: HeroPro
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}
             useFlexGap
-            sx={{ pt: 2, width: { xs: '100%', sm: '350px' } }}
+            flexWrap="wrap"
+            justifyContent="center"
+            sx={{ pt: 2, width: { xs: '100%', sm: 'auto' }, maxWidth: 520 }}
           >
             <input
               type="file"
@@ -172,19 +200,18 @@ export default function Hero({ onUploadComplete, onLocalPreviewChange }: HeroPro
               color="primary"
               size="small"
               onClick={handleBrowseClick}
-              fullWidth
-              disabled={uploading}
+              disabled={uploading || analyzing}
               sx={{ minWidth: 'fit-content' }}
             >
               {selectedFile ? selectedFile.name : 'Browse file'}
             </Button>
             <Button
-              variant={selectedFile ? "contained" : "outlined"}
-              color={selectedFile ? "primary" : "inherit"}
+              variant={selectedFile ? 'contained' : 'outlined'}
+              color={selectedFile ? 'primary' : 'inherit'}
               size="small"
-              onClick={handleUpload}
-              disabled={!selectedFile || uploading}
-              startIcon={uploading ? <CircularProgress size={16} color="inherit" /> : undefined}
+              onClick={handleAnalyze}
+              disabled={!selectedFile || uploading || analyzing}
+              startIcon={analyzing ? <CircularProgress size={16} color="inherit" /> : undefined}
               sx={{
                 minWidth: 'fit-content',
                 ...(!selectedFile && {
@@ -194,7 +221,18 @@ export default function Hero({ onUploadComplete, onLocalPreviewChange }: HeroPro
                 }),
               }}
             >
-              {uploading ? 'Uploading…' : 'Upload'}
+              {analyzing ? 'Analyzing…' : 'Analyze'}
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading || analyzing}
+              startIcon={uploading ? <CircularProgress size={16} color="inherit" /> : undefined}
+              sx={{ minWidth: 'fit-content' }}
+            >
+              {uploading ? 'Uploading…' : 'Upload to cloud'}
             </Button>
           </Stack>
           {uploadError && (
