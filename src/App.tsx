@@ -21,7 +21,9 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    if (import.meta.env.DEV) {
+      console.error('Error caught by boundary:', error, errorInfo);
+    }
   }
 
   render() {
@@ -33,9 +35,6 @@ class ErrorBoundary extends React.Component<
           </Typography>
           <Typography variant="body1" sx={{ mt: 2 }}>
             {this.state.error?.message}
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 2, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-            {this.state.error?.stack}
           </Typography>
         </Box>
       );

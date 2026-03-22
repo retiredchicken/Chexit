@@ -88,7 +88,6 @@ export default function Hero({
       selectedFileRef.current ?? selectedFile ?? fileInputRef.current?.files?.[0] ?? null;
 
     if (!file) {
-      console.warn('[Chexit] Analyze clicked but no file — use Browse file first.');
       onPredictUiChange?.({
         loading: false,
         error: 'Choose a chest X-ray with Browse file, then click Analyze.',
@@ -108,16 +107,13 @@ export default function Hero({
       });
     }
 
-    console.log('[Chexit] Analyze clicked', file.name, file.size, 'bytes', file.type);
     setAnalyzing(true);
     onPredictUiChange?.({ loading: true, error: null, data: null });
     try {
       const data = await predictImage(file);
-      console.log('[Chexit] Analyze OK', data.diagnosis, data.risk_score);
       onPredictUiChange?.({ loading: false, error: null, data });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Analyze failed';
-      console.error('[Chexit] Analyze failed', message, err);
       onPredictUiChange?.({ loading: false, error: message, data: null });
     } finally {
       setAnalyzing(false);
@@ -282,10 +278,8 @@ export default function Hero({
             </Typography>
           )}
           {(predictUi.loading || analyzing) && (
-            <Alert severity="info" sx={{ maxWidth: 560, width: '100%', textAlign: 'left' }}>
-              <strong>Analyzing…</strong> Waiting for the Chexit API (U-Net → MobileNet → Score-CAM). This
-              often takes <strong>several minutes</strong>. Open DevTools → <strong>Console</strong> and look
-              for lines starting with <code>[Chexit]</code>.
+            <Alert severity="info" sx={{ maxWidth: 560, width: '100%', textAlign: 'center' }}>
+              Analyzing… This may take a few minutes.
             </Alert>
           )}
           {!predictUi.loading && !analyzing && predictUi.error ? (
@@ -308,9 +302,8 @@ export default function Hero({
               sx={{ maxWidth: 560, width: '100%', alignItems: 'center', mt: 1 }}
             >
               <Typography variant="body2" color="text.secondary" textAlign="center">
-                <strong>Preview</strong> — this file is sent to the API when you click{' '}
-                <strong>Analyze</strong>. The same image, diagnosis, and heatmap appear together in the{' '}
-                <Link href="#features">AI-assisted TB overview</Link> below.
+                Selected study — use <strong>Analyze</strong>, then view results in the{' '}
+                <Link href="#features">overview</Link> below.
               </Typography>
               <Box
                 component="img"

@@ -30,6 +30,8 @@
 
 5. **Docs** — Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
+The `/predict` **heatmap** PNG is composited at the **same width×height** as the uploaded study (CAM is computed at 224² then upsampled and blended on the full-resolution grayscale base).
+
 ### Optional env
 
 | Variable | Purpose |

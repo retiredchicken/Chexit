@@ -121,20 +121,13 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
         <Typography
           variant="h6"
           sx={{
-            mb: 1,
+            mb: 3,
             color: 'text.primary',
             fontWeight: 600,
             letterSpacing: 0.5,
           }}
         >
           AI-assisted TB overview
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>
-          Three columns: your <strong>input X-ray</strong> (same file as in Analyze above),{' '}
-          <strong>diagnosis &amp; risk</strong> from the Chexit API, and the <strong>heatmap</strong> overlay
-          returned as base64 PNG. Run <code style={{ fontSize: '0.85em' }}>npm run dev</code> +{' '}
-          <code style={{ fontSize: '0.85em' }}>npm run dev:api</code> locally so{' '}
-          <code style={{ fontSize: '0.85em' }}>/api/predict</code> proxies to port 8000.
         </Typography>
 
         {predictUi.error ? (
@@ -187,11 +180,14 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
                   sx={{
                     borderRadius: 2,
                     bgcolor: 'background.default',
-                    border: '1px dashed',
+                    border: '1px solid',
                     borderColor: cardBorder,
                     width: '100%',
-                    aspectRatio: '3 / 4',
-                    objectFit: 'cover',
+                    maxHeight: { xs: '52vh', md: '62vh' },
+                    height: 'auto',
+                    objectFit: 'contain',
+                    display: 'block',
+                    mx: 'auto',
                   }}
                 />
               ) : (
@@ -206,15 +202,13 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
                   }}
                 />
               )}
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" sx={{ color: mutedText }}>
-                  {previewSrc
-                    ? localPreviewUrl
-                      ? 'Matches the file selected with Browse file — POSTed to /predict on Analyze.'
-                      : 'Cloud or shared image — compare with the heatmap column.'
-                    : 'Upload an X-ray in the hero, then Analyze.'}
-                </Typography>
-              </Box>
+              {previewSrc ? (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" sx={{ color: mutedText }}>
+                    Input study (same resolution as uploaded).
+                  </Typography>
+                </Box>
+              ) : null}
             </CardContent>
           </Card>
 {/* Diagnosis */}
@@ -250,7 +244,7 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
 
       {pred ? (
         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, mb: 0.5 }}>
-          TB screening (from latest Analyze):{' '}
+          TB screening:{' '}
           <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
             {isHighRisk ? 'Positive call' : 'Negative call'}
           </Box>
@@ -311,13 +305,8 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
         >
           {riskPct != null ? `${riskPct}%` : predictUi.loading ? '…' : '—'}
         </Typography>
-        <Typography
-          variant="caption"
-          sx={{ color: mutedText, display: 'block', mt: 1 }}
-        >
-          {pred
-            ? 'Values above match the latest Chexit API response (MobileNet TB probability; heatmap = Score-CAM with U-Net lung mask).'
-            : 'Choose an X-ray above and click Analyze to call the Chexit API.'}
+        <Typography variant="caption" sx={{ color: mutedText, display: 'block', mt: 1 }}>
+          {pred ? 'Estimated TB probability from the screening model.' : 'Run Analyze on a chest X-ray to see results.'}
         </Typography>
       </Box>
     </Box>
@@ -396,16 +385,20 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
               {hasHeatmap ? (
                 <Box
                   component="img"
-                  key={`${analysisVersionKey}|${heatmapSrc.slice(0, 48)}`}
+                  key={`${analysisVersionKey}|${heatmapSrc.slice(0, 64)}`}
                   src={heatmapSrc}
-                  alt="Prediction Heatmap"
+                  alt="Saliency overlay on input study"
                   sx={{
                     borderRadius: 2,
                     width: '100%',
-                    aspectRatio: '3 / 4',
+                    maxHeight: { xs: '52vh', md: '62vh' },
+                    height: 'auto',
                     border: '1px solid',
                     borderColor: cardBorder,
-                    objectFit: 'cover',
+                    objectFit: 'contain',
+                    display: 'block',
+                    mx: 'auto',
+                    bgcolor: 'background.default',
                   }}
                 />
               ) : (
@@ -421,13 +414,13 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
                   }}
                 />
               )}
-              <Box sx={{ mt: 2 }}>
+              <Box sx={{ mt: 1.5 }}>
                 <Typography variant="caption" sx={{ color: mutedText }}>
                   {predictUi.loading
-                    ? 'Running pipeline on the API (check browser console + server logs for progress)…'
+                    ? 'Generating overlay…'
                     : pred
-                      ? 'Score-CAM overlay (lung-masked) from the Chexit API.'
-                      : 'Run Analyze to generate a heatmap; this panel stays empty until then.'}
+                      ? 'Saliency overlay on the same study — same pixel dimensions as the input image.'
+                      : 'Heatmap appears here after Analyze.'}
                 </Typography>
               </Box>
             </CardContent>

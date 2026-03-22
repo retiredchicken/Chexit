@@ -109,8 +109,10 @@ function isAbortError(e: unknown): boolean {
 }
 
 function logClient(stage: string, detail?: Record<string, unknown>): void {
+  if (import.meta.env.PROD) {
+    return;
+  }
   const ts = new Date().toISOString();
-  // Use console.log so messages show with default DevTools filters (Info is often hidden).
   if (detail) {
     console.log(`[Chexit ${ts}]`, stage, detail);
   } else {

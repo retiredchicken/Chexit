@@ -232,6 +232,12 @@ def preprocess_original_for_overlay_base(
     return cv2.cvtColor(resized, cv2.COLOR_GRAY2BGR)
 
 
+def preprocess_original_for_overlay_base_fullres(image_bgr_or_gray: np.ndarray) -> np.ndarray:
+    """Grayscale CXR as BGR at native resolution (for heatmap overlay matching input dimensions)."""
+    gray = _to_gray_uint8(image_bgr_or_gray)
+    return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+
 def lung_mask_from_unet(bgr_uint8: np.ndarray, unet: tf.keras.Model) -> np.ndarray:
     """Full-resolution float mask in [0, 1], same HxW as input gray."""
     gray = _to_gray_uint8(bgr_uint8)
@@ -402,8 +408,8 @@ def run_scorecam_with_unet_lung_mask(
     overlay_alpha: float = 0.45,
 ) -> Tuple[int, float, np.ndarray]:
     """
-    Returns predicted_label, prob_tb, overlay_bgr (224²).
-    Overlay = original CXR (resized, no CLAHE) + lung-masked Score-CAM.
+    Returns predicted_label, prob_tb, overlay_bgr at **same H×W as original_bgr**.
+    CAM is computed at 224² then upsampled; blend uses native-resolution grayscale base + lung mask.
     """
     gray = _to_gray_uint8(original_bgr)
     if lung_mask_fullres.shape != gray.shape:
@@ -419,7 +425,6 @@ def run_scorecam_with_unet_lung_mask(
 
     _pipeline_log.info("  Preprocess resize %s, CLAHE=%s…", IMG_SIZE, USE_CLAHE)
     x, _, _ = preprocess_cxr_for_mobilenet(original_bgr, lung_mask=lung_mask_fullres)
-    overlay_base_natural = preprocess_original_for_overlay_base(original_bgr)
     lung_m_224 = cv2.resize(
         lung_mask_fullres.astype(np.float32),
         (IMG_SIZE, IMG_SIZE),
@@ -464,11 +469,18 @@ def run_scorecam_with_unet_lung_mask(
             cam_timings.get("total", 0.0),
         )
 
-    _pipeline_log.info("  Blending CAM overlay on CXR (alpha=%.2f)…", overlay_alpha)
+    _pipeline_log.info("  Blending CAM overlay on CXR full resolution (alpha=%.2f)…", overlay_alpha)
+    hf, wf = int(gray.shape[0]), int(gray.shape[1])
+    norm_cam_full = cv2.resize(
+        norm_cam.astype(np.float32),
+        (wf, hf),
+        interpolation=cv2.INTER_LINEAR,
+    )
+    overlay_base_full = preprocess_original_for_overlay_base_fullres(original_bgr)
     _, ovl_bgr = overlay_cam_on_image_masked(
-        overlay_base_natural,
-        norm_cam,
-        lung_m_224,
+        overlay_base_full,
+        norm_cam_full,
+        lung_mask_fullres,
         alpha=overlay_alpha,
     )
     return pred_label, prob_tb, ovl_bgr
