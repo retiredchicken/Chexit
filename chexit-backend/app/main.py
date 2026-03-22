@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import io
 import logging
 import os
 import sys
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +14,7 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from app.chexit_inference import predict_chexit_from_pil_rgb
+from app.model_loader import download_models_if_needed
 
 
 def _api_logger() -> logging.Logger:
@@ -43,7 +47,20 @@ def _cors_origin_regex() -> str | None:
     return raw or None
 
 
-app = FastAPI(title="Chexit API", version="0.2.0")
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    _api_log.info("Ensuring U-Net models (gdown from Drive if missing)...")
+    t0 = time.perf_counter()
+    try:
+        download_models_if_needed()
+    except Exception:
+        _api_log.exception("Model download failed after %.2fs", time.perf_counter() - t0)
+        raise
+    _api_log.info("Model assets ready in %.2fs", time.perf_counter() - t0)
+    yield
+
+
+app = FastAPI(title="Chexit API", version="0.2.0", lifespan=_lifespan)
 
 app.add_middleware(
     CORSMiddleware,

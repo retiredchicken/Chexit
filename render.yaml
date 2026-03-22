@@ -2,7 +2,8 @@
 # Frontend defaults to https://chexit.onrender.com — VITE_CHEXIT_API_URL on Vercel is optional unless you change the API host.
 # CORS: *.vercel.app is allowed via CHEXIT_CORS_ORIGIN_REGEX by default; add CHEXIT_CORS_ORIGINS for custom domains.
 # /predict can take many minutes — pick an instance with enough RAM/CPU for TensorFlow.
-# Large U-Net weights are gitignored — supply them on the host or via CHEXIT_* URL envs / fetch script.
+# U-Net weights are gitignored; on startup the API downloads them from Google Drive (gdown) unless
+# files already exist under assets/models/. Drive files must be “Anyone with the link” (Viewer).
 
 services:
   - type: web
