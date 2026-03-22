@@ -1,5 +1,8 @@
 import io
+import logging
 import os
+import sys
+import time
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +11,21 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from app.chexit_inference import predict_chexit_from_pil_rgb
+
+
+def _api_logger() -> logging.Logger:
+    log = logging.getLogger("chexit.api")
+    if log.handlers:
+        return log
+    h = logging.StreamHandler(sys.stderr)
+    h.setFormatter(logging.Formatter("%(levelname)s [chexit.api] %(message)s"))
+    log.addHandler(h)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    return log
+
+
+_api_log = _api_logger()
 
 
 def _cors_origins() -> list[str]:
@@ -56,19 +74,34 @@ async def predict(file: UploadFile = File(...)) -> PredictResponse:
         )
 
     file_bytes = await file.read()
+    _api_log.info(
+        "POST /predict filename=%r content_type=%s bytes=%d",
+        file.filename,
+        file.content_type,
+        len(file_bytes),
+    )
 
     try:
         image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image.")
 
+    t0 = time.perf_counter()
     try:
         out = predict_chexit_from_pil_rgb(image)
     except FileNotFoundError as e:
+        _api_log.error("Inference missing model/weights: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
+        _api_log.exception("Inference failed after %.2fs", time.perf_counter() - t0)
         raise HTTPException(status_code=500, detail=f"Inference failed: {e!s}") from e
 
+    _api_log.info(
+        "POST /predict OK in %.2fs diagnosis=%s risk_score=%s",
+        time.perf_counter() - t0,
+        out["diagnosis"],
+        out["risk_score"],
+    )
     return PredictResponse(
         diagnosis=str(out["diagnosis"]),
         risk_score=float(out["risk_score"]),

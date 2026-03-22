@@ -23,6 +23,15 @@ export default function MarketingPage(props: { disableCustomTheme?: boolean }) {
   const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
   const [predictUi, setPredictUi] = React.useState<PredictUiState>(initialPredict);
 
+  /** Clone API payload so React always sees a new `data` reference after each Analyze. */
+  const handlePredictUiChange = React.useCallback((next: PredictUiState) => {
+    setPredictUi({
+      loading: next.loading,
+      error: next.error,
+      data: next.data ? { ...next.data } : null,
+    });
+  }, []);
+
   React.useEffect(() => {
     if (!predictUi.data || predictUi.loading || predictUi.error) {
       return;
@@ -41,7 +50,7 @@ export default function MarketingPage(props: { disableCustomTheme?: boolean }) {
       <Hero
         onUploadComplete={setUploadedPreviewUrl}
         onLocalPreviewChange={setLocalPreviewUrl}
-        onPredictUiChange={setPredictUi}
+        onPredictUiChange={handlePredictUiChange}
       />
       <div>
         {/* <LogoCollection /> */}

@@ -13,9 +13,6 @@ import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import type { PredictUiState } from '../../api/chexit';
 import { db } from '../../firebase';
 
-// Assets served from /assets at the project root (e.g., public/assets)
-const cxrOut = '/assets/cxrout.png';
-
 function formatUploadedAt(seconds: number | null): string {
   if (seconds == null) return 'Uploaded • 2 min ago';
   const d = new Date(seconds * 1000);
@@ -94,15 +91,25 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
         : 'No image uploaded';
 
   const pred = predictUi.data;
-  const heatmapSrc =
-    pred?.heatmap && pred.heatmap.trim() !== ''
-      ? `data:image/png;base64,${pred.heatmap}`
-      : cxrOut;
+  const heatmapB64 = pred?.heatmap?.trim() ?? '';
+  const hasHeatmap = heatmapB64 !== '';
+  const heatmapSrc = hasHeatmap ? `data:image/png;base64,${heatmapB64}` : '';
+  const riskPct =
+    pred != null && Number.isFinite(Number(pred.risk_score))
+      ? Math.round(Number(pred.risk_score))
+      : null;
+  const diagnosisLine = pred?.diagnosis?.trim() ?? '';
+  const confidenceLine = pred?.confidence_label?.trim() ?? '';
   const isHighRisk = Boolean(
-    pred?.diagnosis?.toLowerCase().includes('positive') ||
-      pred?.confidence_label?.toLowerCase().includes('high'),
+    /positive/i.test(diagnosisLine) ||
+      /high/i.test(confidenceLine) ||
+      (riskPct != null && riskPct >= 50),
   );
-  const modelRows = pred ? contributionBars(pred.risk_score) : [
+  /** Remount diagnosis UI when a new API payload arrives so labels/scores never appear stale. */
+  const analysisVersionKey = pred
+    ? `${diagnosisLine}|${riskPct ?? ''}|${confidenceLine}`
+    : 'no-analysis';
+  const modelRows = pred && riskPct != null ? contributionBars(Number(pred.risk_score)) : [
     { label: 'MobileNet-V2', value: 60, barColor: '#6366f1' },
     { label: 'ResNet-50', value: 80, barColor: '#3b82f6' },
     { label: 'DenseNet-121', value: 75, barColor: '#22c55e' },
@@ -221,14 +228,24 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
     {predictUi.loading ? (
       <LinearProgress sx={{ borderRadius: 1 }} />
     ) : null}
-    {/* Top: diagnosis + score */}
-    <Box>
+    {/* Top: diagnosis + score — key forces fresh DOM when a new /predict result lands */}
+    <Box key={analysisVersionKey}>
       <Typography
         variant="overline"
         sx={{ color: mutedText, letterSpacing: 1.5 }}
       >
         DIAGNOSIS
       </Typography>
+
+      {pred ? (
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, mb: 0.5 }}>
+          TB screening (from latest Analyze):{' '}
+          <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            {isHighRisk ? 'Positive call' : 'Negative call'}
+          </Box>
+          {riskPct != null ? ` • model score ${riskPct}%` : null}
+        </Typography>
+      ) : null}
 
       <Box sx={{ mt: 1 }}>
         <Typography
@@ -239,10 +256,12 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
             fontSize: { xs: '2.8rem', md: '3.4rem' },
           }}
         >
-          {pred?.diagnosis ?? (predictUi.loading ? '…' : '—')}
+          {diagnosisLine || (predictUi.loading ? '…' : '—')}
         </Typography>
         <Chip
-          label={pred?.confidence_label ?? (predictUi.loading ? 'Analyzing' : 'Run Analyze')}
+          label={
+            confidenceLine || (predictUi.loading ? 'Analyzing…' : 'Run Analyze')
+          }
           size="small"
           sx={{
             mt: 1,
@@ -279,14 +298,14 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
             fontSize: { xs: '3.8rem', md: '4.4rem' }, // big 70%
           }}
         >
-          {pred != null ? `${Math.round(pred.risk_score)}%` : predictUi.loading ? '…' : '—'}
+          {riskPct != null ? `${riskPct}%` : predictUi.loading ? '…' : '—'}
         </Typography>
         <Typography
           variant="caption"
           sx={{ color: mutedText, display: 'block', mt: 1 }}
         >
           {pred
-            ? 'TB probability (0–100%) from the MobileNet head; heatmap is Score-CAM on the CXR (U-Net lung mask).'
+            ? 'Values above match the latest Chexit API response (MobileNet TB probability; heatmap = Score-CAM with U-Net lung mask).'
             : 'Choose an X-ray above and click Analyze to call the Chexit API.'}
         </Typography>
       </Box>
@@ -363,25 +382,41 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
               }}
             />
             <CardContent sx={{ pt: 1 }}>
-              <Box
-                component="img"
-                key={heatmapSrc}
-                src={heatmapSrc}
-                alt="Prediction Heatmap"
-                sx={{
-                  borderRadius: 2,
-                  width: '100%',
-                  aspectRatio: '3 / 4',
-                  border: '1px solid',
-                  borderColor: cardBorder,
-                  objectFit: 'cover',
-                }}
-              />
+              {hasHeatmap ? (
+                <Box
+                  component="img"
+                  key={`${analysisVersionKey}|${heatmapSrc.slice(0, 48)}`}
+                  src={heatmapSrc}
+                  alt="Prediction Heatmap"
+                  sx={{
+                    borderRadius: 2,
+                    width: '100%',
+                    aspectRatio: '3 / 4',
+                    border: '1px solid',
+                    borderColor: cardBorder,
+                    objectFit: 'cover',
+                  }}
+                />
+              ) : (
+                <Box
+                  aria-hidden
+                  sx={{
+                    borderRadius: 2,
+                    width: '100%',
+                    aspectRatio: '3 / 4',
+                    bgcolor: '#000',
+                    border: '1px solid',
+                    borderColor: cardBorder,
+                  }}
+                />
+              )}
               <Box sx={{ mt: 2 }}>
                 <Typography variant="caption" sx={{ color: mutedText }}>
-                  {pred
-                    ? 'Score-CAM overlay (lung-masked) from the Chexit API.'
-                    : 'Run Analyze to fetch a heatmap from the API, or see the static demo image.'}
+                  {predictUi.loading
+                    ? 'Running pipeline on the API (check browser console + server logs for progress)…'
+                    : pred
+                      ? 'Score-CAM overlay (lung-masked) from the Chexit API.'
+                      : 'Run Analyze to generate a heatmap; this panel stays empty until then.'}
                 </Typography>
               </Box>
             </CardContent>

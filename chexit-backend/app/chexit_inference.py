@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -47,6 +49,21 @@ UNET_MASK_THRESHOLD = float(os.environ.get("CHEXIT_UNET_THRESHOLD", "0.5"))
 MIN_LUNG_PIXELS = int(os.environ.get("CHEXIT_MIN_LUNG_PIXELS", "200"))
 
 CLASS_NAMES = ("TB Negative", "TB Positive")
+
+
+def _setup_pipeline_logger() -> logging.Logger:
+    log = logging.getLogger("chexit.pipeline")
+    if log.handlers:
+        return log
+    h = logging.StreamHandler(sys.stderr)
+    h.setFormatter(logging.Formatter("%(levelname)s [chexit.pipeline] %(message)s"))
+    log.addHandler(h)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    return log
+
+
+_pipeline_log = _setup_pipeline_logger()
 
 _unet_model: Optional[tf.keras.Model] = None
 _mobilenet_model: Optional[tf.keras.Model] = None
@@ -373,7 +390,9 @@ def run_scorecam_with_unet_lung_mask(
 
     if float(np.sum(lung_mask_fullres > 0.5)) < MIN_LUNG_PIXELS:
         lung_mask_fullres = np.ones_like(lung_mask_fullres, dtype=np.float32)
+        _pipeline_log.info("  Lung mask tiny (< %d px); using full image for mask.", MIN_LUNG_PIXELS)
 
+    _pipeline_log.info("  Preprocess resize %s, CLAHE=%s…", IMG_SIZE, USE_CLAHE)
     x, _, _ = preprocess_cxr_for_mobilenet(original_bgr, lung_mask=lung_mask_fullres)
     overlay_base_natural = preprocess_original_for_overlay_base(original_bgr)
     lung_m_224 = cv2.resize(
@@ -383,6 +402,7 @@ def run_scorecam_with_unet_lung_mask(
     )
     lung_m_224 = np.clip(lung_m_224, 0.0, 1.0)
 
+    _pipeline_log.info("  MobileNet TB classification (224, lung-masked input)…")
     y, n_out = _predict_probs(model, x)
     if n_out != 1:
         raise ValueError("Chexit API expects a binary sigmoid MobileNet head.")
@@ -390,13 +410,30 @@ def run_scorecam_with_unet_lung_mask(
     prob_tb = float(np.squeeze(y))
     pred_label = 1 if prob_tb >= 0.5 else 0
     target_class = _resolve_binary_target_class(prob_tb, binary_target_mode)
+    _pipeline_log.info(
+        "  TB prob=%.4f → class=%s (idx=%d), CAM target_class=%d",
+        prob_tb,
+        CLASS_NAMES[pred_label],
+        pred_label,
+        target_class,
+    )
 
-    _, norm_cam, _ = compute_scorecam(
+    _pipeline_log.info("  Score-CAM (channel-wise masked forwards — often several minutes)…")
+    t_cam = time.perf_counter()
+    _, norm_cam, cam_timings = compute_scorecam(
         model,
         x,
         target_class=target_class,
         batch_size=batch_size,
     )
+    _pipeline_log.info(
+        "  Score-CAM done in %.1fs (masked_forwards=%.1fs, total_internal=%.1fs)",
+        time.perf_counter() - t_cam,
+        cam_timings.get("masked_forwards", 0.0),
+        cam_timings.get("total", 0.0),
+    )
+
+    _pipeline_log.info("  Blending CAM overlay on CXR (alpha=%.2f)…", overlay_alpha)
     _, ovl_bgr = overlay_cam_on_image_masked(
         overlay_base_natural,
         norm_cam,
@@ -418,18 +455,44 @@ def predict_chexit_from_bgr(bgr_uint8: np.ndarray) -> Dict[str, Union[str, float
     Full pipeline for API: U-Net mask → MobileNet + Score-CAM overlay.
     ``bgr_uint8``: OpenCV BGR, uint8.
     """
+    t_all = time.perf_counter()
+    h0, w0 = bgr_uint8.shape[:2]
+    _pipeline_log.info("=== pipeline start image=%dx%d ===", w0, h0)
+
+    t0 = time.perf_counter()
     unet = get_unet()
+    _pipeline_log.info("U-Net model ready (load/if-cached %.2fs)", time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
     mobilenet = get_mobilenet()
+    _pipeline_log.info("MobileNet classifier ready (load/if-cached %.2fs)", time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    _pipeline_log.info("Step 1/4: lung segmentation (U-Net @%d)…", UNET_SIZE)
     lung_mask = lung_mask_from_unet(bgr_uint8, unet)
+    _pipeline_log.info("Step 1/4 done in %.2fs", time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    _pipeline_log.info("Step 2–4/4: preprocess + TB score + Score-CAM + overlay…")
     pred_label, prob_tb, ovl = run_scorecam_with_unet_lung_mask(
         mobilenet,
         bgr_uint8,
         lung_mask,
     )
+    _pipeline_log.info("Step 2–4/4 done in %.2fs", time.perf_counter() - t0)
+
     diagnosis = CLASS_NAMES[pred_label]
     risk_score = round(prob_tb * 100.0, 2)
     confidence_label = "High risk" if pred_label == 1 else "Low risk"
+    _pipeline_log.info("Encoding overlay PNG → base64…")
     heatmap_b64 = overlay_to_png_base64(ovl)
+    _pipeline_log.info(
+        "=== pipeline complete total=%.2fs diagnosis=%s risk_score=%s heatmap_b64_len=%d ===",
+        time.perf_counter() - t_all,
+        diagnosis,
+        risk_score,
+        len(heatmap_b64),
+    )
     return {
         "diagnosis": diagnosis,
         "risk_score": risk_score,

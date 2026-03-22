@@ -83,20 +83,47 @@ function isAbortError(e: unknown): boolean {
   return e instanceof Error && e.name === 'AbortError';
 }
 
+function logClient(stage: string, detail?: Record<string, unknown>): void {
+  const ts = new Date().toISOString();
+  if (detail) {
+    console.info(`[Chexit ${ts}]`, stage, detail);
+  } else {
+    console.info(`[Chexit ${ts}]`, stage);
+  }
+}
+
 export async function predictImage(file: File): Promise<PredictResponse> {
   const url = predictUrl();
   const label = apiLabelForErrors();
+  logClient('predict: starting request', {
+    url,
+    fileName: file.name,
+    fileSizeBytes: file.size,
+    fileType: file.type,
+  });
+
   const formData = new FormData();
   formData.append('file', file);
 
+  const t0 = performance.now();
   let res: Response;
   try {
+    logClient('predict: fetch POST /predict (server runs U-Net → MobileNet → Score-CAM; may take several minutes)');
     res = await fetch(url, {
       method: 'POST',
       body: formData,
       signal: predictAbortSignal(),
     });
+    logClient('predict: response headers received', {
+      status: res.status,
+      ok: res.ok,
+      elapsedSec: Math.round((performance.now() - t0) / 1000),
+    });
   } catch (e) {
+    logClient('predict: fetch failed', {
+      error: e instanceof Error ? e.message : String(e),
+      elapsedSec: Math.round((performance.now() - t0) / 1000),
+    });
     if (isAbortError(e)) {
       throw new Error(
         `Analyze timed out after ${Math.round(PREDICT_TIMEOUT_MS / 60000)} minutes, or the request was cancelled. ` +
@@ -119,20 +146,58 @@ export async function predictImage(file: File): Promise<PredictResponse> {
     } catch {
       /* ignore */
     }
+    logClient('predict: HTTP error body', { message });
     throw new Error(message);
   }
 
   let raw: unknown;
   try {
+    logClient('predict: parsing JSON body…');
     raw = await res.json();
+    logClient('predict: JSON parsed');
   } catch {
+    logClient('predict: JSON parse failed');
     throw new Error(
       'The API response could not be read as JSON (the connection may have been closed early). ' +
         'Restart `npm run dev` after pulling the latest `vite.config` proxy timeouts; avoid `uvicorn --reload` during long /predict.',
     );
   }
 
-  return normalizePredictResponse(raw);
+  const out = normalizePredictResponse(raw);
+  logClient('predict: success', {
+    diagnosis: out.diagnosis,
+    risk_score: out.risk_score,
+    confidence_label: out.confidence_label,
+    heatmapBase64Chars: out.heatmap.length,
+    totalElapsedSec: Math.round((performance.now() - t0) / 1000),
+  });
+  return out;
+}
+
+function pickStr(o: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = o[k];
+    if (v != null && String(v).trim() !== '') {
+      return String(v);
+    }
+  }
+  return '';
+}
+
+function pickNum(o: Record<string, unknown>, ...keys: string[]): number {
+  for (const k of keys) {
+    const v = o[k];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return v;
+    }
+    if (typeof v === 'string' && v.trim() !== '') {
+      const n = Number(v);
+      if (Number.isFinite(n)) {
+        return n;
+      }
+    }
+  }
+  return NaN;
 }
 
 function normalizePredictResponse(raw: unknown): PredictResponse {
@@ -140,17 +205,13 @@ function normalizePredictResponse(raw: unknown): PredictResponse {
     throw new Error('Invalid API response: expected a JSON object.');
   }
   const o = raw as Record<string, unknown>;
-  const diagnosis = String(o.diagnosis ?? '');
-  const rawScore = o.risk_score;
-  const risk_score =
-    typeof rawScore === 'number' && Number.isFinite(rawScore)
-      ? rawScore
-      : Number(rawScore);
+  const diagnosis = pickStr(o, 'diagnosis', 'Diagnosis');
+  const risk_score = pickNum(o, 'risk_score', 'riskScore');
   if (!Number.isFinite(risk_score)) {
     throw new Error('Invalid API response: risk_score is not a number.');
   }
-  const confidence_label = String(o.confidence_label ?? '');
-  let heatmap = String(o.heatmap ?? '');
+  const confidence_label = pickStr(o, 'confidence_label', 'confidenceLabel');
+  let heatmap = pickStr(o, 'heatmap', 'Heatmap');
   if (heatmap.startsWith('data:')) {
     const comma = heatmap.indexOf(',');
     if (comma !== -1) {

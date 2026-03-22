@@ -78,13 +78,23 @@ export default function Hero({
     if (!selectedFile) {
       return;
     }
+    console.info('[Chexit]', new Date().toISOString(), 'Analyze clicked', {
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+    });
     setAnalyzing(true);
     onPredictUiChange?.({ loading: true, error: null, data: null });
     try {
       const data = await predictImage(selectedFile);
+      console.info('[Chexit]', new Date().toISOString(), 'Analyze finished OK', {
+        diagnosis: data.diagnosis,
+        risk_score: data.risk_score,
+      });
       onPredictUiChange?.({ loading: false, error: null, data });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Analyze failed';
+      console.error('[Chexit]', new Date().toISOString(), 'Analyze failed', message, err);
       onPredictUiChange?.({ loading: false, error: message, data: null });
     } finally {
       setAnalyzing(false);
