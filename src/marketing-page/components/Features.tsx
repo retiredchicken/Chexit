@@ -121,13 +121,20 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
         <Typography
           variant="h6"
           sx={{
-            mb: 3,
+            mb: 1,
             color: 'text.primary',
             fontWeight: 600,
             letterSpacing: 0.5,
           }}
         >
           AI-assisted TB overview
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>
+          Three columns: your <strong>input X-ray</strong> (same file as in Analyze above),{' '}
+          <strong>diagnosis &amp; risk</strong> from the Chexit API, and the <strong>heatmap</strong> overlay
+          returned as base64 PNG. Run <code style={{ fontSize: '0.85em' }}>npm run dev</code> +{' '}
+          <code style={{ fontSize: '0.85em' }}>npm run dev:api</code> locally so{' '}
+          <code style={{ fontSize: '0.85em' }}>/api/predict</code> proxies to port 8000.
         </Typography>
 
         {predictUi.error ? (
@@ -201,7 +208,11 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
               )}
               <Box sx={{ mt: 2 }}>
                 <Typography variant="caption" sx={{ color: mutedText }}>
-                  {previewSrc ? 'View: PA • Resolution: 1024×1024' : 'Upload an X-ray to preview'}
+                  {previewSrc
+                    ? localPreviewUrl
+                      ? 'Matches the file selected with Browse file — POSTed to /predict on Analyze.'
+                      : 'Cloud or shared image — compare with the heatmap column.'
+                    : 'Upload an X-ray in the hero, then Analyze.'}
                 </Typography>
               </Box>
             </CardContent>

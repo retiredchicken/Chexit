@@ -164,16 +164,14 @@ export default function SignInCard() {
         </Button>
         <Typography sx={{ textAlign: 'center' }}>
           Don&apos;t have an account?{' '}
-          <span>
-            <Link
-              component={RouterLink}
-              to="/dashboard"
-              variant="body2"
-              sx={{ alignSelf: 'center' }}
-            >
-              Visit our marketing page
-            </Link>
-          </span>
+          <Link
+            component={RouterLink}
+            to="/dashboard"
+            variant="body2"
+            sx={{ alignSelf: 'center' }}
+          >
+            Open TB analyzer
+          </Link>
         </Typography>
       </Box>
       <Divider>or</Divider>

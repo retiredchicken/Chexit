@@ -1,6 +1,8 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { Link as RouterLink } from 'react-router-dom';
 import AutoFixHighRoundedIcon from '@mui/icons-material/AutoFixHighRounded';
 import ConstructionRoundedIcon from '@mui/icons-material/ConstructionRounded';
 import SettingsSuggestRoundedIcon from '@mui/icons-material/SettingsSuggestRounded';
@@ -55,6 +57,15 @@ export default function Content() {
           </div>
         </Stack>
       ))}
+      <Button
+        component={RouterLink}
+        to="/dashboard"
+        variant="contained"
+        color="primary"
+        sx={{ alignSelf: { xs: 'stretch', md: 'flex-start' }, mt: 1 }}
+      >
+        Try the analyzer — upload &amp; heatmap
+      </Button>
     </Stack>
   );
 }

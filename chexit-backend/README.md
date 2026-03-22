@@ -24,7 +24,9 @@
    npm run dev:api
    ```
 
-4. **Frontend** — In another terminal, from monorepo root: `npm run dev`. The app calls `/api/predict`, which Vite proxies to `http://127.0.0.1:8000/predict`.
+   **One command (UI + API):** from monorepo root, `npm run dev:stack`.
+
+4. **Frontend** — `npm run dev` (or `dev:stack`). Open **http://localhost:5173/dashboard**. The app calls `/api/predict`, which Vite proxies to `http://127.0.0.1:8000/predict`. `npm run preview` uses the same proxy on localhost.
 
 5. **Docs** — Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
