@@ -287,43 +287,6 @@ export default function Hero({
               {predictUi.error}
             </Alert>
           ) : null}
-          {!predictUi.loading && !analyzing && predictUi.data && !predictUi.error ? (
-            <Alert severity="success" sx={{ maxWidth: 560, width: '100%', textAlign: 'left' }}>
-              Latest analyze: <strong>{predictUi.data.diagnosis}</strong> — TB risk{' '}
-              <strong>{Math.round(Number(predictUi.data.risk_score))}%</strong>.{' '}
-              <Link href="#features" color="inherit" fontWeight={700}>
-                Open results &amp; heatmap ↓
-              </Link>
-            </Alert>
-          ) : null}
-          {localPreviewUrl ? (
-            <Stack
-              spacing={1.5}
-              sx={{ maxWidth: 560, width: '100%', alignItems: 'center', mt: 1 }}
-            >
-              <Typography variant="body2" color="text.secondary" textAlign="center">
-                Selected study — use <strong>Analyze</strong>, then view results in the{' '}
-                <Link href="#features">overview</Link> below.
-              </Typography>
-              <Box
-                component="img"
-                src={localPreviewUrl}
-                alt="Selected chest X-ray preview"
-                sx={{
-                  maxWidth: '100%',
-                  maxHeight: 280,
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  objectFit: 'contain',
-                  bgcolor: 'action.hover',
-                }}
-              />
-              <Button variant="outlined" size="small" href="#features" component="a">
-                Jump to preview &amp; results panel
-              </Button>
-            </Stack>
-          ) : null}
           <Typography
             variant="caption"
             color="text.secondary"
