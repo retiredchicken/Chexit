@@ -1,0 +1,4 @@
+# Shim: when Render "Root Directory" is `chexit-backend` but Build Command is still
+# `pip install -r chexit-backend/requirements.txt`, pip resolves this file.
+# Prefer fixing the dashboard: Build Command → `pip install -r requirements.txt` (no extra folder).
+-r ../requirements.txt
