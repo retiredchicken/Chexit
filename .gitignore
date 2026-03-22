@@ -26,3 +26,14 @@ dist-ssr
 
 # Python backend
 chexit-backend/.venv/
+
+# ML weights & checkpoints (large files — not in Git; use Render env URLs or disk)
+*.keras
+*.h5
+*.hdf5
+*.pth
+*.pt
+*.onnx
+*.pb
+*.tflite
+*.safetensors
