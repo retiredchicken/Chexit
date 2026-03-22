@@ -94,9 +94,10 @@ export default function Features({ previewImageUrl, localPreviewUrl, predictUi }
         : 'No image uploaded';
 
   const pred = predictUi.data;
-  const heatmapSrc = pred?.heatmap
-    ? `data:image/png;base64,${pred.heatmap}`
-    : cxrOut;
+  const heatmapSrc =
+    pred?.heatmap && pred.heatmap.trim() !== ''
+      ? `data:image/png;base64,${pred.heatmap}`
+      : cxrOut;
   const isHighRisk = Boolean(
     pred?.diagnosis?.toLowerCase().includes('positive') ||
       pred?.confidence_label?.toLowerCase().includes('high'),
