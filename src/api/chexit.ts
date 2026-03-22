@@ -13,18 +13,27 @@ export type PredictUiState = {
   data: PredictResponse | null;
 };
 
+/** True when the app is served from this machine (dev server or `vite preview`), not a remote deploy. */
+function isLocalhostApp(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const h = window.location.hostname;
+  return h === 'localhost' || h === '127.0.0.1';
+}
+
 /**
  * Predict URL:
- * - Dev + no VITE_CHEXIT_API_URL → `/api/predict` (Vite proxies to 127.0.0.1:8000; works over HTTPS preview).
- * - VITE_CHEXIT_API_URL set → direct URL (use only if page is http:// or API is https://).
- * - Production build → must set VITE_CHEXIT_API_URL to your deployed HTTPS API.
+ * - Local app (dev or preview) + no VITE_CHEXIT_API_URL → `/api/predict` (Vite proxy → :8000).
+ * - VITE_CHEXIT_API_URL set → that origin (use https on Vercel, etc.).
+ * - Remote deploy without VITE → falls back to defaultBase (set env in CI).
  */
 function predictUrl(): string {
   const trimmed = import.meta.env.VITE_CHEXIT_API_URL?.trim();
   if (trimmed) {
     return `${trimmed.replace(/\/$/, '')}/predict`;
   }
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV || isLocalhostApp()) {
     return '/api/predict';
   }
   return `${defaultBase}/predict`;
@@ -35,7 +44,7 @@ function apiLabelForErrors(): string {
   if (trimmed) {
     return trimmed.replace(/\/$/, '');
   }
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV || isLocalhostApp()) {
     return '/api (proxied to http://127.0.0.1:8000)';
   }
   return defaultBase;
@@ -66,9 +75,9 @@ function networkErrorHint(label: string): string {
     );
   }
   return (
-    `Cannot reach the API (${label}). Start it: cd chexit-backend && ./run_dev.sh — open http://127.0.0.1:8000/docs. ` +
-    `In dev, leave VITE_CHEXIT_API_URL unset to use /api proxy. ` +
-    `Long /predict + uvicorn --reload can drop requests if files save during inference.`
+    `Cannot reach the API (${label}). Start FastAPI: cd chexit-backend && ./run_dev.sh — check http://127.0.0.1:8000/docs. ` +
+    `Use npm run dev or npm run preview (not opening dist/ directly) so /api proxies to port 8000. ` +
+    `Unset VITE_CHEXIT_API_URL for local proxy. Avoid uvicorn --reload during long /predict.`
   );
 }
 
