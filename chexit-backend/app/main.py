@@ -3,6 +3,7 @@ import os
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
@@ -33,6 +34,12 @@ class PredictResponse(BaseModel):
     risk_score: float = Field(..., description="Estimated TB probability (0–100)")
     confidence_label: str
     heatmap: str = Field(..., description="PNG overlay (CAM on CXR) as base64")
+
+
+@app.get("/")
+def root() -> RedirectResponse:
+    """Browser default; API lives under /docs, /health, /predict."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
