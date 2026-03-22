@@ -23,6 +23,16 @@ export default function MarketingPage(props: { disableCustomTheme?: boolean }) {
   const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
   const [predictUi, setPredictUi] = React.useState<PredictUiState>(initialPredict);
 
+  React.useEffect(() => {
+    if (!predictUi.data || predictUi.loading || predictUi.error) {
+      return;
+    }
+    document.getElementById('features')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, [predictUi.data, predictUi.loading, predictUi.error]);
+
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />

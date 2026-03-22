@@ -122,5 +122,43 @@ export async function predictImage(file: File): Promise<PredictResponse> {
     throw new Error(message);
   }
 
-  return res.json() as Promise<PredictResponse>;
+  let raw: unknown;
+  try {
+    raw = await res.json();
+  } catch {
+    throw new Error(
+      'The API response could not be read as JSON (the connection may have been closed early). ' +
+        'Restart `npm run dev` after pulling the latest `vite.config` proxy timeouts; avoid `uvicorn --reload` during long /predict.',
+    );
+  }
+
+  return normalizePredictResponse(raw);
+}
+
+function normalizePredictResponse(raw: unknown): PredictResponse {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid API response: expected a JSON object.');
+  }
+  const o = raw as Record<string, unknown>;
+  const diagnosis = String(o.diagnosis ?? '');
+  const rawScore = o.risk_score;
+  const risk_score =
+    typeof rawScore === 'number' && Number.isFinite(rawScore)
+      ? rawScore
+      : Number(rawScore);
+  if (!Number.isFinite(risk_score)) {
+    throw new Error('Invalid API response: risk_score is not a number.');
+  }
+  const confidence_label = String(o.confidence_label ?? '');
+  let heatmap = String(o.heatmap ?? '');
+  if (heatmap.startsWith('data:')) {
+    const comma = heatmap.indexOf(',');
+    if (comma !== -1) {
+      heatmap = heatmap.slice(comma + 1);
+    }
+  }
+  if (!heatmap.trim()) {
+    throw new Error('Invalid API response: empty heatmap.');
+  }
+  return { diagnosis, risk_score, confidence_label, heatmap };
 }
