@@ -85,10 +85,11 @@ function isAbortError(e: unknown): boolean {
 
 function logClient(stage: string, detail?: Record<string, unknown>): void {
   const ts = new Date().toISOString();
+  // Use console.log so messages show with default DevTools filters (Info is often hidden).
   if (detail) {
-    console.info(`[Chexit ${ts}]`, stage, detail);
+    console.log(`[Chexit ${ts}]`, stage, detail);
   } else {
-    console.info(`[Chexit ${ts}]`, stage);
+    console.log(`[Chexit ${ts}]`, stage);
   }
 }
 
@@ -139,28 +140,44 @@ export async function predictImage(file: File): Promise<PredictResponse> {
     throw e;
   }
 
-  if (!res.ok) {
-    let message = res.statusText;
-    try {
-      message = parseErrorDetail(await res.json());
-    } catch {
-      /* ignore */
-    }
-    logClient('predict: HTTP error body', { message });
-    throw new Error(message);
-  }
+  const bodyText = await res.text();
+  const contentType = res.headers.get('content-type') ?? '';
+  logClient('predict: response body received', {
+    status: res.status,
+    ok: res.ok,
+    contentType,
+    bodyChars: bodyText.length,
+    elapsedSec: Math.round((performance.now() - t0) / 1000),
+  });
 
   let raw: unknown;
   try {
-    logClient('predict: parsing JSON body…');
-    raw = await res.json();
-    logClient('predict: JSON parsed');
+    raw = bodyText.length ? JSON.parse(bodyText) : null;
   } catch {
-    logClient('predict: JSON parse failed');
-    throw new Error(
-      'The API response could not be read as JSON (the connection may have been closed early). ' +
-        'Restart `npm run dev` after pulling the latest `vite.config` proxy timeouts; avoid `uvicorn --reload` during long /predict.',
-    );
+    const looksHtml =
+      bodyText.trimStart().toLowerCase().startsWith('<!') ||
+      bodyText.trimStart().toLowerCase().startsWith('<html');
+    const hint = looksHtml
+      ? 'The server returned HTML instead of JSON. On Vercel/static hosts, /api is not proxied — set VITE_CHEXIT_API_URL to your FastAPI base URL. Locally use npm run dev so /api forwards to port 8000.'
+      : 'The response was not valid JSON (connection cut, proxy error, or wrong endpoint).';
+    logClient('predict: JSON.parse failed', {
+      hint,
+      snippet: bodyText.slice(0, 200).replace(/\s+/g, ' '),
+    });
+    throw new Error(`${hint} First chars: ${bodyText.slice(0, 140).replace(/\s+/g, ' ')}`);
+  }
+
+  if (!res.ok) {
+    let message = res.statusText;
+    if (raw && typeof raw === 'object') {
+      try {
+        message = parseErrorDetail(raw);
+      } catch {
+        /* keep statusText */
+      }
+    }
+    logClient('predict: HTTP error', { message });
+    throw new Error(message || `Request failed (${res.status})`);
   }
 
   const out = normalizePredictResponse(raw);

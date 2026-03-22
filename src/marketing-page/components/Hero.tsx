@@ -1,4 +1,5 @@
 import * as React from 'react';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -17,6 +18,8 @@ const LATEST_DOC_ID = 'latest';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 type HeroProps = {
+  /** Latest analyze state (shown in alerts + passed to Features via parent). */
+  predictUi: PredictUiState;
   onUploadComplete?: (downloadUrl: string) => void;
   /** Temporary `blob:` URL for instant preview in the dashboard (no upload required). */
   onLocalPreviewChange?: (previewUrl: string | null) => void;
@@ -24,11 +27,13 @@ type HeroProps = {
 };
 
 export default function Hero({
+  predictUi,
   onUploadComplete,
   onLocalPreviewChange,
   onPredictUiChange,
 }: HeroProps) {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const selectedFileRef = React.useRef<File | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
   const [analyzing, setAnalyzing] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
@@ -64,6 +69,7 @@ export default function Hero({
       return;
     }
     setSelectedFile(file);
+    selectedFileRef.current = file;
     setUploadError(null);
     setUploadSuccess(false);
     setLocalPreviewUrl(URL.createObjectURL(file));
@@ -74,27 +80,44 @@ export default function Hero({
     fileInputRef.current?.click();
   };
 
-  const handleAnalyze = async () => {
-    if (!selectedFile) {
+  const handleAnalyze = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const file =
+      selectedFileRef.current ?? selectedFile ?? fileInputRef.current?.files?.[0] ?? null;
+
+    if (!file) {
+      console.warn('[Chexit] Analyze clicked but no file — use Browse file first.');
+      onPredictUiChange?.({
+        loading: false,
+        error: 'Choose a chest X-ray with Browse file, then click Analyze.',
+        data: null,
+      });
       return;
     }
-    console.info('[Chexit]', new Date().toISOString(), 'Analyze clicked', {
-      name: selectedFile.name,
-      size: selectedFile.size,
-      type: selectedFile.type,
-    });
+
+    if (file !== selectedFile) {
+      setSelectedFile(file);
+      selectedFileRef.current = file;
+      setLocalPreviewUrl((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(file);
+      });
+    }
+
+    console.log('[Chexit] Analyze clicked', file.name, file.size, 'bytes', file.type);
     setAnalyzing(true);
     onPredictUiChange?.({ loading: true, error: null, data: null });
     try {
-      const data = await predictImage(selectedFile);
-      console.info('[Chexit]', new Date().toISOString(), 'Analyze finished OK', {
-        diagnosis: data.diagnosis,
-        risk_score: data.risk_score,
-      });
+      const data = await predictImage(file);
+      console.log('[Chexit] Analyze OK', data.diagnosis, data.risk_score);
       onPredictUiChange?.({ loading: false, error: null, data });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Analyze failed';
-      console.error('[Chexit]', new Date().toISOString(), 'Analyze failed', message, err);
+      console.error('[Chexit] Analyze failed', message, err);
       onPredictUiChange?.({ loading: false, error: message, data: null });
     } finally {
       setAnalyzing(false);
@@ -206,6 +229,7 @@ export default function Hero({
               style={{ display: 'none' }}
             />
             <Button
+              type="button"
               variant="outlined"
               color="primary"
               size="small"
@@ -216,11 +240,12 @@ export default function Hero({
               {selectedFile ? selectedFile.name : 'Browse file'}
             </Button>
             <Button
+              type="button"
               variant={selectedFile ? 'contained' : 'outlined'}
               color={selectedFile ? 'primary' : 'inherit'}
               size="small"
               onClick={handleAnalyze}
-              disabled={!selectedFile || uploading || analyzing}
+              disabled={uploading || analyzing}
               startIcon={analyzing ? <CircularProgress size={16} color="inherit" /> : undefined}
               sx={{
                 minWidth: 'fit-content',
@@ -234,6 +259,7 @@ export default function Hero({
               {analyzing ? 'Analyzing…' : 'Analyze'}
             </Button>
             <Button
+              type="button"
               variant="outlined"
               color="primary"
               size="small"
@@ -255,6 +281,25 @@ export default function Hero({
               File uploaded. Check preview below.
             </Typography>
           )}
+          {(predictUi.loading || analyzing) && (
+            <Alert severity="info" sx={{ maxWidth: 560, width: '100%', textAlign: 'left' }}>
+              <strong>Analyzing…</strong> Waiting for the Chexit API (U-Net → MobileNet → Score-CAM). This
+              often takes <strong>several minutes</strong>. Open DevTools → <strong>Console</strong> and look
+              for lines starting with <code>[Chexit]</code>.
+            </Alert>
+          )}
+          {!predictUi.loading && !analyzing && predictUi.error ? (
+            <Alert severity="error" sx={{ maxWidth: 560, width: '100%', textAlign: 'left' }}>
+              {predictUi.error}
+            </Alert>
+          ) : null}
+          {!predictUi.loading && !analyzing && predictUi.data && !predictUi.error ? (
+            <Alert severity="success" sx={{ maxWidth: 560, width: '100%', textAlign: 'left' }}>
+              Latest analyze: <strong>{predictUi.data.diagnosis}</strong> — TB risk{' '}
+              <strong>{Math.round(Number(predictUi.data.risk_score))}%</strong>. Scroll down for heatmap and
+              full details.
+            </Alert>
+          ) : null}
           <Typography
             variant="caption"
             color="text.secondary"

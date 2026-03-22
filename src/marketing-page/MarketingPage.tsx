@@ -48,6 +48,7 @@ export default function MarketingPage(props: { disableCustomTheme?: boolean }) {
 
       <AppAppBar />
       <Hero
+        predictUi={predictUi}
         onUploadComplete={setUploadedPreviewUrl}
         onLocalPreviewChange={setLocalPreviewUrl}
         onPredictUiChange={handlePredictUiChange}
