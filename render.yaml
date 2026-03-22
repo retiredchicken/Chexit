@@ -2,12 +2,25 @@
 # Frontend defaults to https://chexit.onrender.com — VITE_CHEXIT_API_URL on Vercel is optional unless you change the API host.
 # CORS: *.vercel.app is allowed via CHEXIT_CORS_ORIGIN_REGEX by default; add CHEXIT_CORS_ORIGINS for custom domains.
 # /predict can take many minutes — pick an instance with enough RAM/CPU for TensorFlow.
+#
+# Git LFS: native Render images include git but not git-lfs. Large U-Net weights are LFS pointers until
+# we download the binary below (~450MB+ LFS — expect a few extra build minutes).
 
 services:
   - type: web
     name: chexit-api
     runtime: python
-    buildCommand: pip install -r chexit-backend/requirements.txt
+    buildCommand: |
+      set -e
+      GIT_LFS_VERSION=3.7.1
+      ARCH="$(uname -m)"
+      case "$ARCH" in x86_64) LFS_ARCH=amd64 ;; aarch64) LFS_ARCH=arm64 ;; *) LFS_ARCH=amd64 ;; esac
+      curl -fsSL "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" -o /tmp/git-lfs.tgz
+      tar -xzf /tmp/git-lfs.tgz -C /tmp
+      export PATH="/tmp/git-lfs-${GIT_LFS_VERSION}:$PATH"
+      git lfs install
+      git lfs pull
+      pip install -r chexit-backend/requirements.txt
     startCommand: cd chexit-backend && PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
