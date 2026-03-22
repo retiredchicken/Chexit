@@ -11,10 +11,12 @@ export type PredictUiState = {
   data: PredictResponse | null;
 };
 
+/** Production FastAPI on Render (no trailing slash). Override with VITE_CHEXIT_API_URL. */
+export const CHEXIT_RENDER_API_ORIGIN = 'https://chexit.onrender.com';
+
 /**
- * Use same-origin `/api/predict` only when Vite’s dev/preview server can proxy to FastAPI.
- * On Vercel (and similar), `vercel.json` rewrites ALL paths to `index.html`; POST `/api/predict`
- * hits the static page and returns 405 Method Not Allowed — must use VITE_CHEXIT_API_URL instead.
+ * Same-origin `/api/predict` when Vite dev/preview proxies to local :8000.
+ * Otherwise call the Render API (or VITE_CHEXIT_API_URL if set).
  */
 function canUseViteApiProxy(): boolean {
   if (import.meta.env.VITE_CHEXIT_API_URL?.trim()) {
@@ -33,34 +35,26 @@ function canUseViteApiProxy(): boolean {
   return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
 }
 
-function predictUrl(): string {
-  const trimmed = import.meta.env.VITE_CHEXIT_API_URL?.trim();
-  if (trimmed) {
-    return `${trimmed.replace(/\/$/, '')}/predict`;
-  }
-  if (canUseViteApiProxy()) {
-    return '/api/predict';
-  }
-  throw new Error(
-    [
-      'Your live site cannot reach FastAPI yet.',
-      '',
-      'Why: Vercel only serves static files; POST /api/predict hits index.html → 405. A laptop URL (http://127.0.0.1:8000) is not reachable from the internet.',
-      '',
-      'Fix: (1) Deploy chexit-backend to a public host with HTTPS (see render.yaml in this repo).',
-      '(2) Vercel → Environment Variables → VITE_CHEXIT_API_URL = https://your-api-host.example (base URL only, no /predict).',
-      '(3) On the API host set CHEXIT_CORS_ORIGINS to your Vercel URL, e.g. https://your-app.vercel.app',
-      '(4) Redeploy the frontend so Vite embeds the new variable.',
-    ].join('\n'),
-  );
-}
-
-function apiLabelForErrors(): string {
+function resolvedApiOrigin(): string {
   const trimmed = import.meta.env.VITE_CHEXIT_API_URL?.trim();
   if (trimmed) {
     return trimmed.replace(/\/$/, '');
   }
-  return '/api (Vite → http://127.0.0.1:8000)';
+  return CHEXIT_RENDER_API_ORIGIN;
+}
+
+function predictUrl(): string {
+  if (canUseViteApiProxy()) {
+    return '/api/predict';
+  }
+  return `${resolvedApiOrigin()}/predict`;
+}
+
+function apiLabelForErrors(): string {
+  if (canUseViteApiProxy()) {
+    return '/api (Vite → http://127.0.0.1:8000)';
+  }
+  return resolvedApiOrigin();
 }
 
 function parseErrorDetail(body: unknown): string {
@@ -88,9 +82,10 @@ function networkErrorHint(label: string): string {
     );
   }
   return (
-    `Cannot reach the API (${label}). Start FastAPI: cd chexit-backend && ./run_dev.sh — check http://127.0.0.1:8000/docs. ` +
-    `Use npm run dev or npm run preview (not opening dist/ directly) so /api proxies to port 8000. ` +
-    `Unset VITE_CHEXIT_API_URL for local proxy. Avoid uvicorn --reload during long /predict.`
+    `Cannot reach the API (${label}). ` +
+      `If testing locally: run FastAPI on port 8000 and use npm run dev so /api proxies. ` +
+      `If using the hosted API: open ${CHEXIT_RENDER_API_ORIGIN}/health in a browser. ` +
+      `Override the API host with VITE_CHEXIT_API_URL. Avoid uvicorn --reload during long /predict.`
   );
 }
 
@@ -182,8 +177,8 @@ export async function predictImage(file: File): Promise<PredictResponse> {
 
   if (!res.ok && res.status === 405) {
     throw new Error(
-      'HTTP 405: POST was rejected. On Vercel this usually means the request hit the SPA (rewrite to index.html), not FastAPI. ' +
-        'Set VITE_CHEXIT_API_URL to your deployed API’s https base URL and redeploy. Locally use npm run dev so /api proxies to port 8000.',
+      'HTTP 405: POST was rejected. If the URL is /api/predict on Vercel, the SPA rewrite caught it — unset VITE_USE_RELATIVE_API or use the default Render API. ' +
+        'Locally use npm run dev so /api proxies to port 8000.',
     );
   }
 
@@ -195,7 +190,7 @@ export async function predictImage(file: File): Promise<PredictResponse> {
       bodyText.trimStart().toLowerCase().startsWith('<!') ||
       bodyText.trimStart().toLowerCase().startsWith('<html');
     const hint = looksHtml
-      ? 'The server returned HTML instead of JSON. On Vercel/static hosts, /api is not proxied — set VITE_CHEXIT_API_URL to your FastAPI base URL. Locally use npm run dev so /api forwards to port 8000.'
+      ? `The server returned HTML instead of JSON (often a 404/SPA page). Use npm run dev for /api proxy, or expect JSON from ${CHEXIT_RENDER_API_ORIGIN}/predict.`
       : 'The response was not valid JSON (connection cut, proxy error, or wrong endpoint).';
     logClient('predict: JSON.parse failed', {
       hint,

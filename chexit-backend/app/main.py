@@ -31,9 +31,16 @@ _api_log = _api_logger()
 def _cors_origins() -> list[str]:
     raw = os.environ.get(
         "CHEXIT_CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://your-vercel-site.vercel.app",
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:4173,http://127.0.0.1:4173",
     )
     return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+def _cors_origin_regex() -> str | None:
+    """Allow any Vercel preview/production *.vercel.app origin when credentials are used."""
+    raw = os.environ.get("CHEXIT_CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app").strip()
+    return raw or None
 
 
 app = FastAPI(title="Chexit API", version="0.2.0")
@@ -41,6 +48,7 @@ app = FastAPI(title="Chexit API", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_origin_regex=_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

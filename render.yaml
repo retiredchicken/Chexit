@@ -1,7 +1,7 @@
 # Optional: Render Dashboard → New → Blueprint → connect this repo.
-# Copy the deployed URL into Vercel as VITE_CHEXIT_API_URL (https only, no /predict).
+# Frontend defaults to https://chexit.onrender.com — VITE_CHEXIT_API_URL on Vercel is optional unless you change the API host.
+# CORS: *.vercel.app is allowed via CHEXIT_CORS_ORIGIN_REGEX by default; add CHEXIT_CORS_ORIGINS for custom domains.
 # /predict can take many minutes — pick an instance with enough RAM/CPU for TensorFlow.
-# Ensure assets/models and weights exist on the server (or CHEXIT_ASSETS_ROOT).
 
 services:
   - type: web
